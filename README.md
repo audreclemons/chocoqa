@@ -39,15 +39,80 @@ Manufacturers rely on controlled specifications, traceability, and continuous im
 
 ---
 
+## Key Outcomes
+
+- Automated QA validation (OK / WARN / FAIL)
+- Full batch traceability
+- Daily quality trends & failure rate analysis
+- Interview-ready demonstration of real manufacturing data workflows
+
+
 ## Data Model (MVP)
 
-### Master Data (DynamoDB: `ChocoQA-MasterData`)
+The ChocoQA MVP uses a simple but production-aligned data model designed
+for traceability, validation, and analytics.
+
+---
+
+## Master Data (DynamoDB: `ChocoQA-MasterData`)
+
+Stores reference data used by the QA intake form and validation logic.
+
+**Product Attributes**
+- `productNo` – Fictitious SKU identifier
+- `productName` – Product description
+- `productType` – Chocolate type (dark, milk, etc.)
+- `wpg` – Weight per gallon
+- `specTempMin` / `specTempMax` – Temperature limits
+- `specViscosityMin` / `specViscosityMax` – Viscosity limits
+
+**Ingredient Attributes**
+- `ingredientId`
+- `ingredientName`
+- `category`
+- `defaultUnit`
+- `allergens`
+
+---
+
+## QA Transactions (DynamoDB: `ChocoQA-Submissions`)
+
+Stores each QA measurement and post-add action.
+
+- `submissionId`
+- `batchId`
+- `lineId` / `tankId`
+- `timestamp`
+- `productNo`
+- `temperature`
+- `viscosity`
+- `specStatus` (`OK` / `WARN` / `FAIL`)
+- `postAddIngredient`
+- `postAddAmount`
+- `s3RawKey` – Pointer to raw event in S3
+
+---
+
+## Analytics Events (S3 → Athena)
+
+Every submission is written as a JSON event to S3 for analytics.
+
+Partitioned by:
+- `year`
+- `month`
+- `day`
+
+These events are queried using Amazon Athena and consumed by Power BI
+for KPI reporting and trend analysis.
+
+
+## Master Data (DynamoDB: `ChocoQA-MasterData`)
 Each product includes:
 - `productNo`, `productName`, `productType`
 - `wpg`
 - `specTempMin/Max`, `specViscosityMin/Max`
 
-### Transactions (DynamoDB: `ChocoQA-Submissions`)
+## Transactions (DynamoDB: `ChocoQA-Submissions`)
 Each submission stores:
 - batch identifiers (batchId, line/tank, timestamp)
 - measured QA values (temp, viscosity)
