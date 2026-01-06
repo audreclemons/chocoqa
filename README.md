@@ -3,7 +3,7 @@
 A portfolio project demonstrating an end-to-end data pipeline for manufacturing QA in a fictitious company, **The Chocolate Factory**.  
 The system captures batch QA measurements and post-add adjustments, enriches them with product master data (SKU/WPG/specs), stores transactions for traceability, lands raw events in an S3 data lake, enables SQL analytics in Athena, and visualizes KPIs in Power BI.
 
- ## MVP (Minimum Viable Product):** This repository represents a functional first release
+## MVP (Minimum Viable Product):** This repository represents a functional first release
  that delivers core QA ingestion, validation, and analytics capabilities, with additional
  enhancements planned in future phases.
 
@@ -31,6 +31,44 @@ Manufacturers rely on controlled specifications, traceability, and continuous im
 - Power BI dashboard for quality insights (FAIL rate, trends, averages)
 
 ---
+
+## Development Sprints (MVP)
+
+This project was delivered iteratively using Agile sprint principles,
+focusing on shippable functionality at each phase.
+
+## Sprint 1 – Core Ingestion & Master Data
+- Serverless backend deployed using AWS SAM
+- Product and ingredient master data modeled in DynamoDB
+- QA intake web form integrated with live APIs
+- Successful end-to-end data submission
+
+## Sprint 2 – Specification Validation & QA Logic
+- Product-level temperature and viscosity specifications added
+- Automated in-spec / out-of-spec evaluation (OK / WARN / FAIL)
+- Enhanced web form with spec visibility
+- Validation logic tested with multiple scenarios
+
+## Sprint 3 – Analytics & Visualization
+- Raw QA events landed to S3 (partitioned)
+- Athena tables created for analytics
+- Power BI connected via Athena ODBC
+- KPI dashboards for trends and failure rates
+
+## Sprint 4 – Advanced QA Analytics & Governance (Planned)
+
+**Goal:**  
+Extend the MVP with deeper analytics and governance capabilities to support
+root-cause analysis and continuous improvement.
+
+**Planned Scope:**
+- Ingredient-level impact analysis on viscosity and temperature
+- Basic SPC control limits using Athena SQL
+- Enhanced Power BI dashboards (control charts, trend alerts)
+- Data quality checks and audit enhancements
+
+**Status:** Planned
+
 
 ## Tech Stack
 - Frontend: HTML/JS static form hosted on S3
