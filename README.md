@@ -58,17 +58,20 @@ focusing on shippable functionality at each phase.
 ## Sprint 4 – Advanced QA Analytics & Governance (Planned)
 
 **Goal:**  
-Extend the MVP with deeper analytics and governance capabilities to support
-root-cause analysis and continuous improvement.
+Extend the MVP with deeper analytics, automation, security, and governance
+capabilities to support root-cause analysis and continuous improvement.
 
 **Planned Scope:**
 - Ingredient-level impact analysis on viscosity and temperature
 - Basic SPC control limits using Athena SQL
 - Enhanced Power BI dashboards (control charts, trend alerts)
 - Data quality checks and audit enhancements
+- Workflow orchestration using Airflow
+- SNS notifications when Post-Add submissions are recorded
+- AI-assisted QA summaries using Amazon Bedrock
+- Submission website authentication using Amazon Cognito
 
 **Status:** Planned
-
 
 ## Tech Stack
 - Frontend: HTML/JS static form hosted on S3
