@@ -29,9 +29,6 @@ Manufacturers rely on controlled specifications, traceability, and continuous im
 ### QA Validation Logic
 ![QA Logic](docs/QA-Validation-Logic.png)
 
-🔐 **Security & Observability:**  
-See [docs/security.md](docs/security.md) for details on API protection, logging, and planned controls.
-
 🔐 **Security Architecture:**  
 ![Security Architecture](docs/security-architecture.png)
 
