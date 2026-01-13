@@ -31,7 +31,6 @@ Manufacturers rely on controlled specifications, traceability, and continuous im
 
 🔐 **Security Architecture:
 ![Security Architecture](docs/security-architecture.png)
-
 ---
 ## Key Features (MVP)
 - Ingredient master data served via API (dropdown-driven UI)
@@ -58,7 +57,7 @@ This project is intentionally delivered in sprints to demonstrate incremental, p
 - Ingredient dropdown populated from live API
 - End-to-end submission flow verified (data stored in DynamoDB)
 
-### Sprint 2 — Product Specs & In/Out-of-Spec Logic 🚧 (In Progress)
+### Sprint 2 — Product Specs & In/Out-of-Spec Logic ✅ (Completed)
 - Add Products/SKUs master data (productNo, WPG, spec ranges)
 - Endpoints:
   - `GET /master/products`
@@ -71,7 +70,7 @@ This project is intentionally delivered in sprints to demonstrate incremental, p
   - display spec ranges read-only
   - enforce spec-driven validation
 
-### Sprint 3 — Analytics Enablement 🟡 (Planned)
+### Sprint 3 — Analytics Enablement ✅ (Completed)
 - Land raw submission events to S3 with partitions (year/month/day/product)
 - Create Athena tables (or Glue crawler)
 - Enable SQL analytics over QA submissions
