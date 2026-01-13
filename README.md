@@ -28,6 +28,8 @@ Authentication via Amazon Cognito is planned for a future sprint.
  **Live Demo:**  
 [https://chocoqa-web-<account675774797158>-id.s3.us-east-1.amazonaws.com/index.html](https://chocoqa-web-675774797158.s3.us-east-1.amazonaws.com/index.html)
 
+📸 **Screenshot:**  
+![QA Submission Form](docs/frontend-ui.png)
 
 ## MVP Architecture
 **Web Form (S3)** → **API Gateway** → **Lambda (validate/enrich)** →  
