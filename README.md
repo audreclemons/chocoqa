@@ -19,9 +19,7 @@ Manufacturers rely on controlled specifications, traceability, and continuous im
 
 ### Architecture Diagram
 ![MVP Architecture](docs/architecture.png)
-
 ---
-
 ## Key Features (MVP)
 - Product master data (fictitious SKU, WPG, spec ranges) served via API
 - QA intake web form populated from master data
