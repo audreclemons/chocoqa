@@ -134,5 +134,16 @@ Each submission stores:
 
 ---
 
-## S3 Data Lake Layout (Sprint 3)
+## S3 Data Lake Layout 
+
+```text
+s3://chocoqa-data/
+└── raw/
+    └── year=YYYY/
+        └── month=MM/
+            └── day=DD/
+                └── product=<productNo>/
+                    └── submission-<id>.json
+
+
 
