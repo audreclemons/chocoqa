@@ -26,7 +26,7 @@ Security measures include:
 Authentication via Amazon Cognito is planned for a future sprint.
 
  **Live Demo:**  
-https://chocoqa-web-account675774797158-id.s3.us-east-1.amazonaws.com/index.html
+https://chocoqa-web-<account675774797158>-id.s3.us-east-1.amazonaws.com/index.html
 
 
 ## MVP Architecture
