@@ -35,27 +35,3 @@ See [docs/security.md](docs/security.md) for details on API protection, logging,
 
 ![Security Architecture](docs/security-architecture.png)
 
-## QA Submission Workflow
-
-```text
-Select Product
- → Select Ingredient
- → Enter % / PPM
- → Enter Temperature & Viscosity
- → Submit QA Record
-
-Key Features (MVP)
-
-Product master data (fictitious SKU, WPG, spec ranges) served via API
-
-QA intake web form populated from master data
-
-Serverless ingestion with validation and enrichment
-
-Transaction storage in DynamoDB for batch traceability
-
-Raw event landing zone in S3 with partitioned folder structure
-
-Athena SQL queries for KPI calculations
-
-Power BI dashboard for quality insights (FAIL rate, trends, averages)
