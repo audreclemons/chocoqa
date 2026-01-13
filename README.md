@@ -79,14 +79,26 @@ This project is intentionally delivered in sprints to demonstrate incremental, p
   - Submission trends over time
   - Average viscosity vs spec
 
-### Sprint 4 — Governance & AI Enhancements 🟣 (Phase 2 / Planned)
-- Airflow orchestration for data pipelines
-- Data contract validation (Great Expectations / Soda)
-- Quarantine invalid records + curated Parquet datasets
-- Alerting (SNS) for pipeline and quality failures
-- AI/ML insights:
-  - anomaly detection
-  - natural-language explanations (“why did this batch fail?”)
+## Sprint 4 — Governance & AI Enhancements 🟣 (Phase 2 / Planned)
+
+**Goal:**  
+Introduce governance, automation, security, and AI-driven insights to support
+enterprise-grade quality analytics and decision-making.
+
+**Planned Scope:**
+- Workflow orchestration using Apache Airflow for data pipelines
+- Data contract validation using Great Expectations or Soda
+- Quarantine handling for invalid records
+- Curated analytics datasets stored in Parquet format
+- Alerting via Amazon SNS for pipeline and quality failures
+- Authentication and access control using Amazon Cognito
+  - Secure QA submission access
+  - Role-based access for analytics and administration
+- AI/ML-driven insights, including:
+  - Anomaly detection on QA metrics
+  - Natural-language explanations (e.g., *“Why did this batch fail?”*) using Amazon Bedrock
+
+**Status:** Planned
 
 ---
 
