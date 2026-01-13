@@ -17,19 +17,19 @@ Manufacturers rely on controlled specifications, traceability, and continuous im
 **DynamoDB (master + submissions)** + **S3 (raw data lake)** →  
 **Athena (SQL)** → **Power BI (dashboards)**
 
-### Architecture Diagram
+## Architecture Diagram:**
 ![MVP Architecture](docs/architecture.png)
 
-### System Architecture
+## System Architecture:**
 ![System Architecture](docs/architecture.png)
 
-### Data Flow
+## Data Flow:**
 ![Data Flow](docs/Data-Flow.png)
 
-### QA Validation Logic
+## QA Validation Logic:**
 ![QA Logic](docs/QA-Validation-Logic.png)
 
-🔐 **Security Architecture:**  
+##🔐 **Security Architecture:**  
 ![Security Architecture](docs/security-architecture.png)
 
 ---
