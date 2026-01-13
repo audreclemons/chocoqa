@@ -31,6 +31,26 @@ Authentication via Amazon Cognito is planned for a future sprint.
 📸 **Screenshot:**  
 ![QA Submission Form](docs/frontend-ui.png)
 
+## QA Data Submission Interface (Frontend)
+
+The ChocoQA platform includes a lightweight, production-style web interface
+used by QA technicians to submit batch measurements and post-add data.
+
+### Features
+- Product selection driven by live master data APIs
+- Ingredient selection with percentage / PPM input
+- Temperature and viscosity capture
+- Server-side specification validation (OK / WARN / FAIL)
+- Event-driven submission to backend services
+
+### User Workflow
+Select Product
+ → Select Ingredient
+ → Enter % / PPM
+ → Enter Temperature & Viscosity
+ → Submit QA Record
+
+
 ## MVP Architecture
 **Web Form (S3)** → **API Gateway** → **Lambda (validate/enrich)** →  
 **DynamoDB (master + submissions)** + **S3 (raw data lake)** →  
@@ -48,7 +68,7 @@ Authentication via Amazon Cognito is planned for a future sprint.
 ## QA Validation Logic:
 ![QA Logic](docs/QA-Validation-Logic.png)
 
-🔐 **Security Architecture:
+## Security Architecture:
 ![Security Architecture](docs/security-architecture.png)
 ---
 ## Key Features (MVP)
