@@ -19,11 +19,42 @@ Manufacturers rely on controlled specifications, traceability, and continuous im
 
 ### Architecture Diagram
 ![MVP Architecture](docs/architecture.png)
+
+### System Architecture
+![System Architecture](docs/architecture.png)
+
+### Data Flow
+![Data Flow](docs/data-flow.png)
+
+### QA Validation Logic
+![QA Logic](docs/qa-validation-logic.png)
+
 🔐 **Security & Observability:**  
 See [docs/security.md](docs/security.md) for details on API protection, logging, and planned controls.
 🔐 **Security Architecture:**  
 
 ![Security Architecture](docs/security-architecture.png)
+
+## QA Data Submission Interface (Frontend)
+
+The ChocoQA platform includes a lightweight, production-style web interface
+used by QA technicians to submit batch measurements and post-add data.
+
+### Features
+- Product selection driven by live master data APIs
+- Ingredient selection with percentage / PPM input
+- Temperature and viscosity capture
+- Server-side specification validation (OK / WARN / FAIL)
+- Event-driven submission to backend services
+
+### User Workflow
+```text
+Select Product
+ → Select Ingredient
+ → Enter % / PPM
+ → Enter Temperature & Viscosity
+ → Submit QA Record
+
 ---
 ## Key Features (MVP)
 - Product master data (fictitious SKU, WPG, spec ranges) served via API
