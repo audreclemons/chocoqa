@@ -12,6 +12,23 @@ Manufacturers rely on controlled specifications, traceability, and continuous im
 
 ---
 
+## Demo Hosting & Security
+
+The frontend is hosted using Amazon S3 static website hosting
+and is publicly accessible for demonstration purposes.
+
+Security measures include:
+- No secrets or credentials in frontend code
+- Server-side validation in AWS Lambda
+- API Gateway rate limiting
+- Least-privilege IAM roles
+
+Authentication via Amazon Cognito is planned for a future sprint.
+
+ **Live Demo:**  
+https://chocoqa-web-account675774797158-id.s3.us-east-1.amazonaws.com/index.html
+
+
 ## MVP Architecture
 **Web Form (S3)** → **API Gateway** → **Lambda (validate/enrich)** →  
 **DynamoDB (master + submissions)** + **S3 (raw data lake)** →  
