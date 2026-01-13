@@ -24,10 +24,10 @@ Manufacturers rely on controlled specifications, traceability, and continuous im
 ![System Architecture](docs/architecture.png)
 
 ### Data Flow
-![Data Flow](docs/Data Flow.png)
+![Data Flow](docs/Data-Flow.png)
 
 ### QA Validation Logic
-![QA Logic](docs/QA Validation Logic.png)
+![QA Logic](docs/QA-Validation-Logic.png)
 
 🔐 **Security & Observability:**  
 See [docs/security.md](docs/security.md) for details on API protection, logging, and planned controls.
