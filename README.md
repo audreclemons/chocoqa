@@ -17,7 +17,8 @@ Manufacturers rely on controlled specifications, traceability, and continuous im
 **DynamoDB (master + submissions)** + **S3 (raw data lake)** →  
 **Athena (SQL)** → **Power BI (dashboards)**
 
-> Diagram: see `/docs/architecture.png`
+### Architecture Diagram
+![MVP Architecture](docs/architecture.png)
 
 ---
 
