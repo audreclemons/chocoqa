@@ -199,4 +199,12 @@ s3://chocoqa-data/
                     └── submission-<id>.json
 
 
+## 📄 License
 
+This project is licensed under the **MIT License**.
+
+The MIT License was chosen to:
+- Clearly define how the code can be used
+- Allow review, reuse, and modification with attribution
+- Make the project safe to share publicly as a portfolio example
+- Align with common open-source and industry practices
