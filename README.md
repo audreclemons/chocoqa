@@ -199,6 +199,8 @@ s3://chocoqa-data/
                     └── submission-<id>.json
 
 
+---
+
 ## 📄 License
 
 This project is licensed under the **MIT License**.
