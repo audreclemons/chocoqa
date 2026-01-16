@@ -189,7 +189,6 @@ Each submission stores:
 
 ## S3 Data Lake Layout 
 
-```text
 s3://chocoqa-data/
 └── raw/
     └── year=YYYY/
