@@ -59,9 +59,6 @@ Select Product
 **DynamoDB (master + submissions)** + **S3 (raw data lake)** →  
 **Athena (SQL)** → **Power BI (dashboards)**
 
-## Architecture Diagram:
-![MVP Architecture](docs/architecture.png)
-
 ## System Architecture:
 ![System Architecture](docs/architecture.png)
 
