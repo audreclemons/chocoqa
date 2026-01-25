@@ -1,0 +1,40 @@
+{
+  "products": [
+    {
+      "productNo": "CHOC001",
+      "productName": "Dark Chocolate Bar",
+      "productType": "DARK",
+      "WPG": "100g",
+      "specs": {
+        "tempMin": 45,
+        "tempMax": 50,
+        "viscosityMin": 2.5,
+        "viscosityMax": 4.0
+      }
+    },
+    {
+      "productNo": "CHOC002",
+      "productName": "Milk Chocolate Bar",
+      "productType": "MILK",
+      "WPG": "100g",
+      "specs": {
+        "tempMin": 40,
+        "tempMax": 45,
+        "viscosityMin": 3.0,
+        "viscosityMax": 5.0
+      }
+    },
+    {
+      "productNo": "CHOC003",
+      "productName": "White Chocolate Bar",
+      "productType": "WHITE",
+      "WPG": "100g",
+      "specs": {
+        "tempMin": 38,
+        "tempMax": 42,
+        "viscosityMin": 2.0,
+        "viscosityMax": 3.5
+      }
+    }
+  ]
+}
