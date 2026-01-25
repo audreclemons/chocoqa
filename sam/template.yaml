@@ -1,1 +1,712 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
 
+Parameters:
+  DomainName:
+    Type: String
+    Default: ""
+    Description: "Custom domain name (optional)"
+  CertificateArn:
+    Type: String
+    Default: ""
+    Description: "SSL certificate ARN for custom domain"
+
+Globals:
+  Api:
+    Cors:
+      AllowMethods: "'GET,POST,OPTIONS'"
+      AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+      AllowOrigin: "'*'"
+
+Resources:
+  # WAF for API Protection with Domain Restrictions
+  WebACL:
+    Type: AWS::WAFv2::WebACL
+    Properties:
+      Name: !Sub "${AWS::StackName}-waf"
+      Scope: REGIONAL
+      DefaultAction:
+        Allow: {}
+      Rules:
+        - Name: RateLimitRule
+          Priority: 1
+          Statement:
+            RateBasedStatement:
+              Limit: 2000
+              AggregateKeyType: IP
+          Action:
+            Block: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: RateLimitRule
+
+  WebACLAssociation:
+    Type: AWS::WAFv2::WebACLAssociation
+    Properties:
+      ResourceArn: !Sub "arn:aws:apigateway:${AWS::Region}::/restapis/${ServerlessRestApi}/stages/Prod"
+      WebACLArn: !GetAtt WebACL.Arn
+
+  DataTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: chocoqa-data
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+
+  MasterDataTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: ChocoQA-MasterData
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+
+  DataBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'chocoqa-data-${AWS::AccountId}'
+
+  AthenaResultsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'chocoqa-athena-results-${AWS::AccountId}'
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldResults
+            Status: Enabled
+            ExpirationInDays: 30
+
+  ChocoQAWorkGroup:
+    Type: AWS::Athena::WorkGroup
+    Properties:
+      Name: chocoqa-analytics
+      Description: Workgroup for ChocoQA analytics queries
+      State: ENABLED
+      WorkGroupConfiguration:
+        ResultConfiguration:
+          OutputLocation: !Sub 's3://${AthenaResultsBucket}/query-results/'
+          EncryptionConfiguration:
+            EncryptionOption: SSE_S3
+        EnforceWorkGroupConfiguration: true
+        PublishCloudWatchMetricsEnabled: true
+        BytesScannedCutoffPerQuery: 1073741824
+
+  AnalyticsDatabase:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: chocoqa_analytics
+        Description: Database for ChocoQA analytics tables
+
+  WebBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'chocoqa-web-${AWS::AccountId}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: index.html
+
+  WebBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref WebBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowCloudFrontAccess
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity ${OriginAccessIdentity}'
+            Action: s3:GetObject
+            Resource: !Sub 'arn:aws:s3:::${WebBucket}/*'
+
+  # CloudFront Distribution
+  OriginAccessIdentity:
+    Type: AWS::CloudFront::OriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: !Sub "OAI for ${AWS::StackName}"
+
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Origins:
+          - Id: WebsiteOrigin
+            DomainName: !GetAtt WebBucket.RegionalDomainName
+            S3OriginConfig:
+              OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${OriginAccessIdentity}"
+          - Id: ApiOrigin
+            DomainName: !Sub "${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com"
+            OriginPath: /Prod
+            CustomOriginConfig:
+              HTTPPort: 443
+              OriginProtocolPolicy: https-only
+        DefaultCacheBehavior:
+          TargetOriginId: WebsiteOrigin
+          ViewerProtocolPolicy: redirect-to-https
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+        CacheBehaviors:
+          - PathPattern: "/api/*"
+            TargetOriginId: ApiOrigin
+            ViewerProtocolPolicy: https-only
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+            OriginRequestPolicyId: 88a5eaf4-2fd4-4709-b370-b4c650ea3fcf
+        Enabled: true
+        DefaultRootObject: index.html
+        Aliases: !If
+          - HasCustomDomain
+          - [!Ref DomainName]
+          - !Ref "AWS::NoValue"
+        ViewerCertificate: !If
+          - HasCustomDomain
+          - AcmCertificateArn: !Ref CertificateArn
+            SslSupportMethod: sni-only
+          - CloudFrontDefaultCertificate: true
+
+  SubmitFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      InlineCode: |
+        const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
+        const { DynamoDBDocumentClient, PutCommand, GetCommand } = require('@aws-sdk/lib-dynamodb');
+        const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+        
+        const client = new DynamoDBClient({});
+        const dynamodb = DynamoDBDocumentClient.from(client);
+        const s3 = new S3Client({});
+        
+        exports.handler = async (event) => {
+            try {
+                const body = JSON.parse(event.body);
+                
+                // Get product specs for validation
+                let specStatus = 'UNKNOWN';
+                if (body.productId && (body.temperature || body.viscosity)) {
+                    const productResult = await dynamodb.send(new GetCommand({
+                        TableName: process.env.MASTER_TABLE_NAME,
+                        Key: { PK: `PROD#${body.productId}`, SK: 'META' }
+                    }));
+                    
+                    if (productResult.Item && productResult.Item.specs) {
+                        const specs = productResult.Item.specs;
+                        let tempStatus = 'OK', viscStatus = 'OK';
+                        
+                        if (body.temperature) {
+                            if (body.temperature < specs.tempMin || body.temperature > specs.tempMax) {
+                                tempStatus = 'FAIL';
+                            } else if (body.temperature < specs.tempMin + 1 || body.temperature > specs.tempMax - 1) {
+                                tempStatus = 'WARN';
+                            }
+                        }
+                        
+                        if (body.viscosity) {
+                            if (body.viscosity < specs.viscosityMin || body.viscosity > specs.viscosityMax) {
+                                viscStatus = 'FAIL';
+                            } else if (body.viscosity < specs.viscosityMin + 0.2 || body.viscosity > specs.viscosityMax - 0.2) {
+                                viscStatus = 'WARN';
+                            }
+                        }
+                        
+                        specStatus = (tempStatus === 'FAIL' || viscStatus === 'FAIL') ? 'FAIL' : 
+                                   (tempStatus === 'WARN' || viscStatus === 'WARN') ? 'WARN' : 'OK';
+                    }
+                }
+                
+                const item = {
+                    id: Date.now().toString(),
+                    productId: body.productId,
+                    ingredientId: body.ingredientId || '',
+                    percentage: body.percentage || 0,
+                    temperature: body.temperature || null,
+                    viscosity: body.viscosity || null,
+                    specStatus: specStatus,
+                    data: body.data,
+                    timestamp: body.timestamp || new Date().toISOString()
+                };
+                
+                await dynamodb.send(new PutCommand({
+                    TableName: process.env.TABLE_NAME,
+                    Item: item
+                }));
+                
+                // Also write to S3 for analytics
+                const date = new Date(item.timestamp);
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                
+                const s3Key = `analytics/year=${year}/month=${month}/day=${day}/product=${item.productId}/${item.id}.json`;
+                
+                await s3.send(new PutObjectCommand({
+                    Bucket: process.env.ANALYTICS_BUCKET,
+                    Key: s3Key,
+                    Body: JSON.stringify(item),
+                    ContentType: 'application/json'
+                }));
+                
+                return {
+                    statusCode: 200,
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Access-Control-Allow-Origin': '*'
+                    },
+                    body: JSON.stringify({ message: 'Success', id: item.id, specStatus: specStatus })
+                };
+            } catch (error) {
+                return {
+                    statusCode: 500,
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Access-Control-Allow-Origin': '*'
+                    },
+                    body: JSON.stringify({ message: error.message })
+                };
+            }
+        };
+      Handler: index.handler
+      Runtime: nodejs18.x
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref DataTable
+          MASTER_TABLE_NAME: !Ref MasterDataTable
+          ANALYTICS_BUCKET: !Ref DataBucket
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DataTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref MasterDataTable
+        - S3WritePolicy:
+            BucketName: !Ref DataBucket
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            Path: /submit
+            Method: post
+
+  MasterDataFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      InlineCode: |
+        const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
+        const { DynamoDBDocumentClient, ScanCommand, GetCommand } = require('@aws-sdk/lib-dynamodb');
+        
+        const client = new DynamoDBClient({});
+        const dynamodb = DynamoDBDocumentClient.from(client);
+        
+        exports.handler = async (event) => {
+            try {
+                const path = event.path || event.rawPath;
+                
+                if (path === '/master/ingredients') {
+                    const result = await dynamodb.send(new ScanCommand({
+                        TableName: process.env.MASTER_TABLE_NAME,
+                        FilterExpression: 'begins_with(PK, :pk)',
+                        ExpressionAttributeValues: { ':pk': 'ING#' }
+                    }));
+                    
+                    const ingredients = result.Items.map(item => ({
+                        ingredientId: item.ingredientId,
+                        ingredientName: item.ingredientName,
+                        category: item.category,
+                        allergens: item.allergens,
+                        defaultUnit: item.defaultUnit,
+                        status: item.status
+                    }));
+                    
+                    return {
+                        statusCode: 200,
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'Access-Control-Allow-Origin': '*'
+                        },
+                        body: JSON.stringify({ ingredients })
+                    };
+                }
+                
+                if (path === '/master/products') {
+                    const result = await dynamodb.send(new ScanCommand({
+                        TableName: process.env.MASTER_TABLE_NAME,
+                        FilterExpression: 'begins_with(PK, :pk)',
+                        ExpressionAttributeValues: { ':pk': 'PROD#' }
+                    }));
+                    
+                    const products = result.Items.map(item => ({
+                        productNo: item.productNo,
+                        productName: item.productName,
+                        productType: item.productType,
+                        WPG: item.WPG,
+                        specs: item.specs
+                    }));
+                    
+                    return {
+                        statusCode: 200,
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'Access-Control-Allow-Origin': '*'
+                        },
+                        body: JSON.stringify({ products })
+                    };
+                }
+                
+                if (path.startsWith('/master/products/')) {
+                    const productNo = path.split('/')[3];
+                    const result = await dynamodb.send(new GetCommand({
+                        TableName: process.env.MASTER_TABLE_NAME,
+                        Key: { PK: `PROD#${productNo}`, SK: 'META' }
+                    }));
+                    
+                    if (!result.Item) {
+                        return {
+                            statusCode: 404,
+                            headers: { 
+                                'Content-Type': 'application/json',
+                                'Access-Control-Allow-Origin': '*'
+                            },
+                            body: JSON.stringify({ message: 'Product not found' })
+                        };
+                    }
+                    
+                    const product = {
+                        productNo: result.Item.productNo,
+                        productName: result.Item.productName,
+                        productType: result.Item.productType,
+                        WPG: result.Item.WPG,
+                        specs: result.Item.specs
+                    };
+                    
+                    return {
+                        statusCode: 200,
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'Access-Control-Allow-Origin': '*'
+                        },
+                        body: JSON.stringify(product)
+                    };
+                }
+                
+                if (path === '/analytics/powerbi/fail-rate') {
+                    const result = await dynamodb.send(new ScanCommand({
+                        TableName: process.env.TABLE_NAME
+                    }));
+                    
+                    const analytics = {};
+                    result.Items.forEach(item => {
+                        const product = item.productId || 'UNKNOWN';
+                        if (!analytics[product]) {
+                            analytics[product] = { total: 0, failures: 0 };
+                        }
+                        analytics[product].total++;
+                        if (item.specStatus === 'FAIL') {
+                            analytics[product].failures++;
+                        }
+                    });
+                    
+                    const powerBIData = Object.keys(analytics).map(product => ({
+                        product: product,
+                        total_submissions: analytics[product].total,
+                        failures: analytics[product].failures,
+                        fail_rate_percent: Math.round((analytics[product].failures / analytics[product].total) * 100 * 100) / 100
+                    }));
+                    
+                    return {
+                        statusCode: 200,
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'Access-Control-Allow-Origin': '*'
+                        },
+                        body: JSON.stringify(powerBIData)
+                    };
+                }
+                
+                if (path === '/analytics/powerbi/trends') {
+                    const result = await dynamodb.send(new ScanCommand({
+                        TableName: process.env.TABLE_NAME
+                    }));
+                    
+                    const trends = {};
+                    result.Items.forEach(item => {
+                        const date = new Date(item.timestamp);
+                        const dateKey = date.toISOString().split('T')[0];
+                        if (!trends[dateKey]) {
+                            trends[dateKey] = { submissions: 0, tempSum: 0, viscSum: 0, tempCount: 0, viscCount: 0, failures: 0 };
+                        }
+                        trends[dateKey].submissions++;
+                        if (item.temperature) {
+                            trends[dateKey].tempSum += item.temperature;
+                            trends[dateKey].tempCount++;
+                        }
+                        if (item.viscosity) {
+                            trends[dateKey].viscSum += item.viscosity;
+                            trends[dateKey].viscCount++;
+                        }
+                        if (item.specStatus === 'FAIL') {
+                            trends[dateKey].failures++;
+                        }
+                    });
+                    
+                    const powerBIData = Object.keys(trends).map(date => ({
+                        submission_date: date,
+                        daily_submissions: trends[date].submissions,
+                        avg_temperature: trends[date].tempCount > 0 ? Math.round((trends[date].tempSum / trends[date].tempCount) * 100) / 100 : null,
+                        avg_viscosity: trends[date].viscCount > 0 ? Math.round((trends[date].viscSum / trends[date].viscCount) * 100) / 100 : null,
+                        daily_failures: trends[date].failures
+                    })).sort((a, b) => a.submission_date.localeCompare(b.submission_date));
+                    
+                    return {
+                        statusCode: 200,
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'Access-Control-Allow-Origin': '*'
+                        },
+                        body: JSON.stringify(powerBIData)
+                    };
+                }
+                
+                if (path === '/analytics/powerbi/viscosity') {
+                    const result = await dynamodb.send(new ScanCommand({
+                        TableName: process.env.TABLE_NAME
+                    }));
+                    
+                    const viscosity = {};
+                    result.Items.forEach(item => {
+                        if (item.viscosity && item.productId) {
+                            const product = item.productId;
+                            if (!viscosity[product]) {
+                                viscosity[product] = { viscSum: 0, count: 0, ok: 0, warn: 0, fail: 0 };
+                            }
+                            viscosity[product].viscSum += item.viscosity;
+                            viscosity[product].count++;
+                            if (item.specStatus === 'OK') viscosity[product].ok++;
+                            else if (item.specStatus === 'WARN') viscosity[product].warn++;
+                            else if (item.specStatus === 'FAIL') viscosity[product].fail++;
+                        }
+                    });
+                    
+                    const powerBIData = Object.keys(viscosity).map(product => ({
+                        productId: product,
+                        avg_viscosity: Math.round((viscosity[product].viscSum / viscosity[product].count) * 100) / 100,
+                        sample_count: viscosity[product].count,
+                        in_spec_count: viscosity[product].ok,
+                        warn_count: viscosity[product].warn,
+                        fail_count: viscosity[product].fail
+                    }));
+                    
+                    return {
+                        statusCode: 200,
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'Access-Control-Allow-Origin': '*'
+                        },
+                        body: JSON.stringify(powerBIData)
+                    };
+                }
+                
+                return {
+                    statusCode: 200,
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Access-Control-Allow-Origin': '*'
+                    },
+                    body: JSON.stringify({ products: [] })
+                };
+            } catch (error) {
+                return {
+                    statusCode: 500,
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Access-Control-Allow-Origin': '*'
+                    },
+                    body: JSON.stringify({ message: error.message })
+                };
+            }
+        };
+      Handler: index.handler
+      Runtime: nodejs18.x
+      Environment:
+        Variables:
+          MASTER_TABLE_NAME: !Ref MasterDataTable
+          TABLE_NAME: !Ref DataTable
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref MasterDataTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref DataTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            Path: /masterdata
+            Method: get
+        IngredientsApi:
+          Type: Api
+          Properties:
+            Path: /master/ingredients
+            Method: get
+        ProductsApi:
+          Type: Api
+          Properties:
+            Path: /master/products
+            Method: get
+        ProductByIdApi:
+          Type: Api
+          Properties:
+            Path: /master/products/{productNo}
+            Method: get
+        PowerBIFailRateApi:
+          Type: Api
+          Properties:
+            Path: /analytics/powerbi/fail-rate
+            Method: get
+        PowerBITrendsApi:
+          Type: Api
+          Properties:
+            Path: /analytics/powerbi/trends
+            Method: get
+        PowerBIViscosityApi:
+          Type: Api
+          Properties:
+            Path: /analytics/powerbi/viscosity
+            Method: get
+
+  SeederFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      InlineCode: |
+        const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
+        const { DynamoDBDocumentClient, PutCommand } = require('@aws-sdk/lib-dynamodb');
+        
+        const client = new DynamoDBClient({});
+        const dynamodb = DynamoDBDocumentClient.from(client);
+        
+        const ingredients = [
+            {ingredientId: "ING-001", ingredientName: "Cocoa Liquor", category: "COCOA", allergens: [], defaultUnit: "%", status: "ACTIVE"},
+            {ingredientId: "ING-002", ingredientName: "Cocoa Butter", category: "FAT", allergens: [], defaultUnit: "%", status: "ACTIVE"},
+            {ingredientId: "ING-003", ingredientName: "Sugar", category: "SWEETENER", allergens: [], defaultUnit: "%", status: "ACTIVE"},
+            {ingredientId: "ING-004", ingredientName: "Milk Powder", category: "DAIRY", allergens: ["MILK"], defaultUnit: "%", status: "ACTIVE"},
+            {ingredientId: "ING-005", ingredientName: "Milk Fat", category: "DAIRY_FAT", allergens: ["MILK"], defaultUnit: "%", status: "ACTIVE"},
+            {ingredientId: "ING-006", ingredientName: "Soy Lecithin", category: "EMULSIFIER", allergens: ["SOY"], defaultUnit: "%", status: "ACTIVE"},
+            {ingredientId: "ING-007", ingredientName: "Sunflower Lecithin", category: "EMULSIFIER", allergens: [], defaultUnit: "%", status: "ACTIVE"},
+            {ingredientId: "ING-008", ingredientName: "PGPR", category: "EMULSIFIER", allergens: [], defaultUnit: "%", status: "ACTIVE"},
+            {ingredientId: "ING-009", ingredientName: "Vanilla Flavor", category: "FLAVOR", allergens: [], defaultUnit: "ppm", status: "ACTIVE"},
+            {ingredientId: "ING-010", ingredientName: "Salt", category: "MINOR_INGREDIENT", allergens: [], defaultUnit: "ppm", status: "ACTIVE"},
+            {ingredientId: "ING-011", ingredientName: "Almond Pieces", category: "INCLUSION", allergens: ["TREE_NUTS"], defaultUnit: "%", status: "ACTIVE"},
+            {ingredientId: "ING-012", ingredientName: "Crisped Rice", category: "INCLUSION", allergens: [], defaultUnit: "%", status: "ACTIVE"}
+        ];
+        
+        const products = [
+            {productNo: "CHOC001", productName: "Dark Chocolate Bar", productType: "DARK", WPG: "100g", specs: {tempMin: 45, tempMax: 50, viscosityMin: 2.5, viscosityMax: 4.0}},
+            {productNo: "CHOC002", productName: "Milk Chocolate Bar", productType: "MILK", WPG: "100g", specs: {tempMin: 40, tempMax: 45, viscosityMin: 3.0, viscosityMax: 5.0}},
+            {productNo: "CHOC003", productName: "White Chocolate Bar", productType: "WHITE", WPG: "100g", specs: {tempMin: 38, tempMax: 42, viscosityMin: 2.0, viscosityMax: 3.5}}
+        ];
+        
+        exports.handler = async (event) => {
+            try {
+                for (const ingredient of ingredients) {
+                    await dynamodb.send(new PutCommand({
+                        TableName: process.env.MASTER_TABLE_NAME,
+                        Item: {
+                            PK: `ING#${ingredient.ingredientId}`,
+                            SK: 'META',
+                            ...ingredient
+                        }
+                    }));
+                }
+                
+                for (const product of products) {
+                    await dynamodb.send(new PutCommand({
+                        TableName: process.env.MASTER_TABLE_NAME,
+                        Item: {
+                            PK: `PROD#${product.productNo}`,
+                            SK: 'META',
+                            ...product
+                        }
+                    }));
+                }
+                
+                return {
+                    statusCode: 200,
+                    body: JSON.stringify({ message: `Seeded ${ingredients.length} ingredients and ${products.length} products` })
+                };
+            } catch (error) {
+                return {
+                    statusCode: 500,
+                    body: JSON.stringify({ message: error.message })
+                };
+            }
+        };
+      Handler: index.handler
+      Runtime: nodejs18.x
+      Environment:
+        Variables:
+          MASTER_TABLE_NAME: !Ref MasterDataTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref MasterDataTable
+
+Conditions:
+  HasCustomDomain: !Not [!Equals [!Ref DomainName, ""]]
+
+Outputs:
+  CloudFrontURL:
+    Description: "CloudFront distribution URL"
+    Value: !Sub "https://${CloudFrontDistribution.DomainName}"
+    Export:
+      Name: !Sub "${AWS::StackName}-CloudFrontURL"
+  
+  WebsiteURL:
+    Description: "Static website URL"
+    Value: !Sub "http://${WebBucket}.s3-website-${AWS::Region}.amazonaws.com"
+    Export:
+      Name: !Sub "${AWS::StackName}-WebsiteURL"
+  
+  ApiEndpoint:
+    Description: "API Gateway endpoint URL"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
+    Export:
+      Name: !Sub "${AWS::StackName}-ApiEndpoint"
+  
+  MasterDataTable:
+    Description: "DynamoDB table for master data"
+    Value: !Ref MasterDataTable
+    Export:
+      Name: !Sub "${AWS::StackName}-MasterDataTable"
+  
+  DataTable:
+    Description: "DynamoDB table for submissions"
+    Value: !Ref DataTable
+    Export:
+      Name: !Sub "${AWS::StackName}-DataTable"
+  
+  AthenaWorkGroup:
+    Description: "Athena WorkGroup for analytics"
+    Value: !Ref ChocoQAWorkGroup
+    Export:
+      Name: !Sub "${AWS::StackName}-AthenaWorkGroup"
+  
+  AnalyticsDatabase:
+    Description: "Glue Database for analytics"
+    Value: !Ref AnalyticsDatabase
+    Export:
+      Name: !Sub "${AWS::StackName}-AnalyticsDatabase"
